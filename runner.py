@@ -7,9 +7,11 @@ import re
 
 VERSION="0.1-poc"
 
+#Yup, that is global scpe :-(
 AVAILABLE_FORMATS = dict()
 
 def register_format(short_name, description):
+  """ Decorator for classes used to parse input file. """
   def _prox(a):
     AVAILABLE_FORMATS[short_name] = dict(
       description=description,
@@ -19,6 +21,7 @@ def register_format(short_name, description):
   return _prox
 
 class InputFileParser(object):
+  """ Interface class """
   def __init__(self, filename, options=None):
     self.filename = filename
     self.options = options
@@ -49,7 +52,7 @@ class YamlFileParser(InputFileParser):
     for entry in yaml.load(open(self.filename, 'r')):
       yield row
 
-@register_format("regex", "Flat text file, regexp applied to each line. Kinda grep ;-)")
+@register_format("regex", "Usage: regex:expression. Flat text file, regexp applied to each line. Kinda grep ;-)")
 class RegexFileParser(InputFileParser):
   def produce_targets(self):
     rex = re.compile(self.options)
@@ -58,6 +61,22 @@ class RegexFileParser(InputFileParser):
         #print(row, match)
         yield(match.group(0))
 
+
+
+
+class TheRunmeMachine(object):
+  '''Holds configuration for tests'''
+  def __init__(self, config):
+    self.config = config
+    print(config)
+
+  def iterate_over_targets(self, iterable):
+    for target in iterable:
+      self.run_on_target(target)
+
+  def run_on_target(self, target): # target is a String !
+    for case in self.config['cases']:
+      print(case, target)
   
 
 def main():
@@ -68,10 +87,10 @@ def main():
   #subopt = subparser.add_parser("list", help="List available formats (for --format)")
   #subopt = subparser.add_parser("run", help="Run test fomr [confing] on [targtes] (see run -h for help)")
 
-  parser.add_argument("--config", help="Configuration file name", required=True)
+  parser.add_argument("--config", help="Configuration file name")
   parser.add_argument("--output", help="Output file name.", default="report.yaml", dest="out_file")
   parser.add_argument("--load",   help="Load targets from file. Use --format to specify format.", default=None, dest="source_file")
-  parser.add_argument("--format", help="Specify file format. Syntax: [format:options]. Use '?' to get list", default="flat")
+  parser.add_argument("--format", help="Specify file format. Syntax: [format:options]. Use '?' as argument to get list", default="flat")
   parser.add_argument("--target", help="Add target to target list. Can be used multiple times. Will be tested in order, before targets loaded from file (if provided)", action="append", dest="targets", default=[])  
   
   #grp = parser.add_mutually_exclusive_group(required=True)
@@ -79,8 +98,6 @@ def main():
   #grp.add_argument("--load",   help="Load targets from file. Use --format to specify format.", default=None, dest="source_file")
   #subgrp = grp.add_argument_group()
  
- 
-
 
   args = parser.parse_args()
 
@@ -90,7 +107,7 @@ def main():
       print(" * {name:10s} : {description}".format(name=name, **val))
     return
 
-  def item_generator():
+  def _target_generator():
     if len(args.targets)>0:
       print(">>> ARG targets")
       for x in args.targets:
@@ -106,8 +123,21 @@ def main():
       for x in fmt_obj.produce_targets():
         yield x
 
-  for target in item_generator():
-    print("TARGET: ", target)
+  if len(args.targets) == 0 and args.source_file is None:
+    print("WARNING:\n  target list empty. User --target or --load to fix that :-) \n\n")
+    return
+
+  if args.config is None:
+    print("WARNING:\n  you did not provide case config file. Use --config to fix that :-) \n\n")
+    return
+
+  conf = yaml.full_load(open(args.config, 'r').read())
+  machine = TheRunmeMachine(conf)
+  machine.iterate_over_targets(_target_generator())
+
+  #for target in item_generator():
+  #  machine.run_on_target(target)
+
 
 
 if __name__ == '__main__':

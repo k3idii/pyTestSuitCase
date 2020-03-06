@@ -1,0 +1,13 @@
+
+
+common_targets: &tgt1
+  - { hsot: "0xe.ee", port: 80}
+  - { host: "example.com", port: 80}
+
+
+cases:
+  - name: "simple HTTP request"
+    
+
+
+
